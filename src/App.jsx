@@ -1,8 +1,14 @@
 import "./App.css";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 function App() {
-  const [activeTab, setActiveTab] = useState("inventory");
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem("activeTab") || "inventory";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("activeTab", activeTab);
+  }, [activeTab]);
 
   const formatPHP = (value) =>
     new Intl.NumberFormat("en-PH", {
@@ -247,7 +253,9 @@ function App() {
     if (monthlyBudget > 0 && grandTotal > 0) {
       const projected = monthlyGroceryTotal + grandTotal;
       if (projected > monthlyBudget) {
-        const confirmOver = window.confirm("This purchase exceeds your monthly grocery budget. Continue?");
+        const confirmOver = window.confirm(
+          "This purchase exceeds your monthly grocery budget. Continue?"
+        );
         if (!confirmOver) return;
       }
     }
@@ -284,11 +292,20 @@ function App() {
 
   const totalCost = restockCost + manualCost;
   const projectedGroceryTotal = monthlyGroceryTotal + totalCost;
-const projectedRemainingBudget = monthlyBudget - projectedGroceryTotal;
-const projectedBudgetPercent =
-  monthlyBudget > 0
-    ? Math.min((projectedGroceryTotal / monthlyBudget) * 100, 100)
-    : 0;
+
+  const projectedRemainingBudget = monthlyBudget - projectedGroceryTotal;
+
+  const projectedBudgetPercent =
+    monthlyBudget > 0 ? Math.min((projectedGroceryTotal / monthlyBudget) * 100, 100) : 0;
+
+  // Smart Budget Color Logic
+  let budgetColor = "#22c55e"; // green safe zone
+
+  if (projectedBudgetPercent >= 90) {
+    budgetColor = "#ef4444"; // red danger
+  } else if (projectedBudgetPercent >= 70) {
+    budgetColor = "#f59e0b"; // orange warning
+  }
 
   // ================= BILLS =================
   const [bills, setBills] = useState(() => {
@@ -386,7 +403,9 @@ const projectedBudgetPercent =
       const orig = Number(l.originalBalance);
       const term = Number(l.term);
       const unit = l.termUnit || "months";
-      const freq = l.paymentFrequency || (unit === "weeks" ? "weekly" : unit === "days" ? "daily" : "monthly");
+      const freq =
+        l.paymentFrequency ||
+        (unit === "weeks" ? "weekly" : unit === "days" ? "daily" : "monthly");
       const manualPaid = Number(l.installmentsPaid);
 
       return {
@@ -422,7 +441,8 @@ const projectedBudgetPercent =
     if (!Number.isFinite(mon) || mon < 0) return;
     if (!Number.isFinite(term) || term <= 0) return;
 
-    const termUnit = loanFrequency === "daily" ? "days" : loanFrequency === "weekly" ? "weeks" : "months";
+    const termUnit =
+      loanFrequency === "daily" ? "days" : loanFrequency === "weekly" ? "weeks" : "months";
 
     const newLoan = {
       id: Date.now(),
@@ -517,6 +537,22 @@ const projectedBudgetPercent =
     });
   }
 
+  // ================= DASHBOARD METRICS (FIXED: AFTER bills + loans exist) =================
+  const totalLoanRemaining = loans.reduce((sum, l) => sum + (Number(l.balance) || 0), 0);
+
+  const totalLoanOriginal = loans.reduce(
+    (sum, l) => sum + (Number(l.originalBalance) || 0),
+    0
+  );
+
+  const unpaidBillsCount = bills.filter((b) => {
+    const ym = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
+    return !b.paidByMonth?.[ym];
+  }).length;
+
+  const groceryStatus =
+    projectedBudgetPercent >= 90 ? "Over Budget" : projectedBudgetPercent >= 70 ? "Warning" : "Healthy";
+
   // ================= TOP SUMMARY (moved above H1) =================
   const TopMonthlySummary = () => (
     <div style={{ border: "2px solid #333", padding: 16, marginBottom: 18, borderRadius: 12 }}>
@@ -537,7 +573,15 @@ const projectedBudgetPercent =
         <strong>{formatPHP(monthlyBillTotal)}</strong>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: "bold", marginTop: 10 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 18,
+          fontWeight: "bold",
+          marginTop: 10,
+        }}
+      >
         <span>Total Monthly Expenditures</span>
         <span>{formatPHP(monthlyOverallTotal)}</span>
       </div>
@@ -550,13 +594,12 @@ const projectedBudgetPercent =
   // ================= UI =================
   return (
     <div className="app-container">
-      {/* moved here: monthly summary ABOVE the H1 */}
-      <TopMonthlySummary />
+     
 
       <h1>Home Ledger</h1>
 
       <nav className="nav-tabs">
-        {["inventory", "grocery", "bills", "loans", "history"].map((tab) => (
+        {["dashboard", "inventory", "grocery", "bills", "loans", "history"].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -567,11 +610,103 @@ const projectedBudgetPercent =
         ))}
       </nav>
 
+      {/* ================= DASHBOARD TAB (NEW: YOU HAD A TAB WITH NO CONTENT) ================= */}
+      {activeTab === "dashboard" && (
+        <div>
+          <h2>Dashboard</h2>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
+            <div style={{ border: "2px solid #333", padding: 14, borderRadius: 12 }}>
+              <div style={{ fontWeight: 700 }}>Grocery Budget Status</div>
+              <div style={{ marginTop: 10, fontSize: 18, fontWeight: "bold" }}>{groceryStatus}</div>
+              <div style={{ marginTop: 8, opacity: 0.9 }}>
+                Spent (this month): <strong>{formatPHP(monthlyGroceryTotal)}</strong>
+              </div>
+              <div style={{ opacity: 0.9 }}>
+                Budget: <strong>{monthlyBudget > 0 ? formatPHP(monthlyBudget) : "-"}</strong>
+              </div>
+              <div style={{ marginTop: 10, height: 10, background: "#1f2937", borderRadius: 6 }}>
+                <div
+                  style={{
+                    width: `${projectedBudgetPercent}%`,
+                    height: "100%",
+                    background: budgetColor,
+                    borderRadius: 6,
+                    transition: "width 0.3s ease, background 0.3s ease",
+                  }}
+                />
+              </div>
+              <div style={{ marginTop: 8, opacity: 0.9 }}>
+                Remaining (projected):{" "}
+                <strong style={{ color: projectedRemainingBudget < 0 ? "red" : "green" }}>
+                  {formatPHP(projectedRemainingBudget)}
+                </strong>
+              </div>
+            </div>
+
+            <div style={{ border: "2px solid #333", padding: 14, borderRadius: 12 }}>
+              <div style={{ fontWeight: 700 }}>Bills</div>
+              <div style={{ marginTop: 10, fontSize: 28, fontWeight: "bold" }}>{unpaidBillsCount}</div>
+              <div style={{ opacity: 0.9 }}>Unpaid bills this month</div>
+
+              <div style={{ marginTop: 12, borderTop: "1px solid #ddd", paddingTop: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>Total Bills</span>
+                  <strong>{formatPHP(billsThisMonthTotal)}</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                  <span>Paid</span>
+                  <strong>{formatPHP(billsPaidThisMonthTotal)}</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                  <span>Remaining</span>
+                  <strong>{formatPHP(billsThisMonthTotal - billsPaidThisMonthTotal)}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ border: "2px solid #333", padding: 14, borderRadius: 12 }}>
+              <div style={{ fontWeight: 700 }}>Loans</div>
+              <div style={{ marginTop: 10, opacity: 0.9 }}>
+                Remaining Balance: <strong>{formatPHP(totalLoanRemaining)}</strong>
+              </div>
+              <div style={{ marginTop: 6, opacity: 0.9 }}>
+                Original Total: <strong>{formatPHP(totalLoanOriginal)}</strong>
+              </div>
+
+              <div style={{ marginTop: 12, borderTop: "1px solid #ddd", paddingTop: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>Loans Paid (this month)</span>
+                  <strong>{formatPHP(monthlyLoanTotal)}</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
+                  <span># of Active Loans</span>
+                  <strong>{loans.filter((l) => !l.completed).length}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ border: "2px solid #333", padding: 14, borderRadius: 12 }}>
+              <div style={{ fontWeight: 700 }}>Inventory</div>
+              <div style={{ marginTop: 10, opacity: 0.9 }}>
+                Total Items: <strong>{inventory.length}</strong>
+              </div>
+              <div style={{ marginTop: 6, opacity: 0.9 }}>
+                Needs Restock: <strong>{restockItems.length}</strong>
+              </div>
+              <div style={{ marginTop: 12, borderTop: "1px solid #ddd", paddingTop: 10, opacity: 0.9 }}>
+                Highest Grocery Trip (this month): <strong>{formatPHP(highestTrip)}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ================= INVENTORY TAB ================= */}
       {activeTab === "inventory" && (
         <div>
           <h2>Add Item</h2>
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <div className="form-grid">
             <input placeholder="Item name" value={itemName} onChange={(e) => setItemName(e.target.value)} />
             <input placeholder="Capacity" type="number" value={capacity} onChange={(e) => setCapacity(e.target.value)} />
             <input placeholder="Current" type="number" value={current} onChange={(e) => setCurrent(e.target.value)} />
@@ -638,11 +773,17 @@ const projectedBudgetPercent =
         <div>
           {/* Grocery budget panel INSIDE grocery tab (above Restock) */}
           <div style={{ border: "2px solid #333", padding: 14, borderRadius: 12, marginBottom: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "baseline",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
               <div style={{ fontWeight: "bold" }}>Grocery Budget (This Month)</div>
-              <div>
-                Spent (incl. cart): {formatPHP(projectedGroceryTotal)}
-              </div>
+              <div>Spent (incl. cart): {formatPHP(projectedGroceryTotal)}</div>
             </div>
 
             <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
@@ -672,13 +813,14 @@ const projectedBudgetPercent =
                   </strong>
                 </div>
 
-                <div style={{ height: 10, background: "#eee", borderRadius: 6, marginTop: 8 }}>
+                <div style={{ height: 10, background: "#1f2937", borderRadius: 6, marginTop: 8 }}>
                   <div
                     style={{
                       width: `${projectedBudgetPercent}%`,
                       height: "100%",
-                      background: budgetPercent >= 100 ? "red" : "#333",
+                      background: budgetColor,
                       borderRadius: 6,
+                      transition: "width 0.3s ease, background 0.3s ease",
                     }}
                   />
                 </div>
@@ -745,7 +887,7 @@ const projectedBudgetPercent =
           </div>
 
           <h2 style={{ marginTop: "24px" }}>Manual Items</h2>
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <div className="form-grid">
             <input placeholder="Item name" value={manualName} onChange={(e) => setManualName(e.target.value)} />
             <input placeholder="Price" type="number" value={manualPrice} onChange={(e) => setManualPrice(e.target.value)} />
             <button onClick={addManualItem}>Add</button>
@@ -857,10 +999,7 @@ const projectedBudgetPercent =
             const paid = !!b.paidByMonth?.[ym];
 
             return (
-              <div
-                key={b.id}
-                style={{ border: "1px solid #ccc", padding: 12, marginTop: 12, borderRadius: 10 }}
-              >
+              <div key={b.id} style={{ border: "1px solid #ccc", padding: 12, marginTop: 12, borderRadius: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
                   <strong>{b.name}</strong>
                   <button onClick={() => deleteBill(b.id)}>Delete</button>
@@ -918,7 +1057,9 @@ const projectedBudgetPercent =
 
             {/* Term input */}
             <input
-              placeholder={`Term (# of ${loanFrequency === "daily" ? "days" : loanFrequency === "weekly" ? "weeks" : "months"}) e.g. 24`}
+              placeholder={`Term (# of ${
+                loanFrequency === "daily" ? "days" : loanFrequency === "weekly" ? "weeks" : "months"
+              }) e.g. 24`}
               type="number"
               value={loanTerm}
               onChange={(e) => setLoanTerm(e.target.value)}
@@ -949,12 +1090,12 @@ const projectedBudgetPercent =
           <button
             onClick={clearAllHistory}
             style={{
-              marginBottom: "16px",
+              marginBottom: 16,
               background: "#c62828",
               color: "white",
               padding: "8px 12px",
               border: "none",
-              borderRadius: "6px",
+              borderRadius: 8,
               cursor: "pointer",
             }}
           >
@@ -966,32 +1107,48 @@ const projectedBudgetPercent =
           {purchaseHistory.map((entry) => {
             const entryType = normalizeEntryType(entry);
 
-            const cardBg =
-              entryType === "loan"
-                ? "#e3f2fd"
-                : entryType === "bill"
-                ? "#fff3e0"
-                : "white";
+            const typeStyles = {
+              grocery: {
+                bg: "rgba(46,125,50,0.08)",
+                border: "1px solid rgba(46,125,50,0.35)",
+                label: "Grocery",
+              },
+              loan: {
+                bg: "rgba(33,150,243,0.08)",
+                border: "1px solid rgba(33,150,243,0.35)",
+                label: "Loan Payment",
+              },
+              bill: {
+                bg: "rgba(255,152,0,0.08)",
+                border: "1px solid rgba(255,152,0,0.35)",
+                label: "Bill Payment",
+              },
+            };
+
+            const currentStyle = typeStyles[entryType] || typeStyles.grocery;
 
             return (
               <div
                 key={entry.id}
                 style={{
-                  border: "1px solid #ccc",
-                  padding: "16px",
-                  marginBottom: "16px",
-                  borderRadius: "10px",
-                  background: cardBg,
+                  padding: 18,
+                  marginBottom: 18,
+                  borderRadius: 16,
+                  background: currentStyle.bg,
+                  border: currentStyle.border,
+                  boxShadow: "0 6px 18px rgba(0,0,0,0.25)",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <strong>{new Date(entry.date).toLocaleString()}</strong>
+                  <div style={{ fontSize: 13, opacity: 0.7 }}>{new Date(entry.date).toLocaleString()}</div>
+
                   <button
                     onClick={() => deleteHistoryEntry(entry.id)}
                     style={{
-                      background: "transparent",
-                      border: "1px solid #ccc",
-                      borderRadius: "6px",
+                      background: "rgba(255,255,255,0.1)",
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      borderRadius: 8,
+                      padding: "4px 8px",
                       cursor: "pointer",
                     }}
                   >
@@ -999,29 +1156,43 @@ const projectedBudgetPercent =
                   </button>
                 </div>
 
-                {/* Bill/Loan simplified display */}
+                {/* TYPE BADGE */}
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    padding: "4px 10px",
+                    display: "inline-block",
+                    borderRadius: 20,
+                    background: currentStyle.border,
+                  }}
+                >
+                  {currentStyle.label}
+                </div>
+
+                {/* Bill / Loan */}
                 {(entryType === "bill" || entryType === "loan") && (
-                  <div style={{ marginTop: 12 }}>
-                    <div style={{ fontWeight: "bold" }}>
-                      {entry.title || (entryType === "bill" ? "Bill Payment" : "Loan Payment")}
-                    </div>
-                    <div style={{ marginTop: 10, fontSize: 20, fontWeight: "bold", textAlign: "right" }}>
-                      Total: {formatPHP(entry.grandTotal)}
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ fontWeight: 600 }}>{entry.title || currentStyle.label}</div>
+                    <div style={{ marginTop: 12, fontSize: 22, fontWeight: "bold", textAlign: "right" }}>
+                      {formatPHP(entry.grandTotal)}
                     </div>
                   </div>
                 )}
 
-                {/* Grocery display preserved */}
+                {/* Grocery */}
                 {entryType === "grocery" && (
                   <>
                     {entry.restockItems?.length > 0 && (
-                      <div style={{ marginTop: "12px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
+                      <div style={{ marginTop: 14 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
                           <span>Restock Items</span>
                           <span>{formatPHP(entry.restockTotal)}</span>
                         </div>
+
                         {entry.restockItems.map((item, i) => (
-                          <div key={i} style={{ paddingLeft: "12px" }}>
+                          <div key={i} style={{ paddingLeft: 12 }}>
                             {item.name} x{item.quantity}
                             <span style={{ float: "right" }}>{formatPHP(item.cost)}</span>
                           </div>
@@ -1030,13 +1201,14 @@ const projectedBudgetPercent =
                     )}
 
                     {entry.manualItems?.length > 0 && (
-                      <div style={{ marginTop: "12px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold" }}>
+                      <div style={{ marginTop: 14 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
                           <span>Manual Items</span>
                           <span>{formatPHP(entry.manualTotal)}</span>
                         </div>
+
                         {entry.manualItems.map((item, i) => (
-                          <div key={i} style={{ paddingLeft: "12px" }}>
+                          <div key={i} style={{ paddingLeft: 12 }}>
                             {item.name} x{item.quantity}
                             <span style={{ float: "right" }}>{formatPHP(item.cost)}</span>
                           </div>
@@ -1044,7 +1216,7 @@ const projectedBudgetPercent =
                       </div>
                     )}
 
-                    <div style={{ marginTop: "16px", fontSize: "20px", fontWeight: "bold", textAlign: "right" }}>
+                    <div style={{ marginTop: 16, fontSize: 22, fontWeight: "bold", textAlign: "right" }}>
                       Grand Total: {formatPHP(entry.grandTotal)}
                     </div>
                   </>
@@ -1065,19 +1237,15 @@ function LoanCard({ loan, formatPHP, onDelete, onPay, onSetPaid }) {
   const term = Number(loan.term) || 0;
   const paid = Number(loan.installmentsPaid) || 0;
 
+  const paymentAmount = Number(loan.paymentAmount ?? 0) || 0;
+
+  const trackedTotal = paymentAmount * term;
+  const totalPaidByTerms = paymentAmount * paid;
+
+  const remainingTerms = Math.max(0, term - paid);
+  const remainingByTerms = paymentAmount * remainingTerms;
+
   const progressPercent = term > 0 ? Math.min((paid / term) * 100, 100) : 0;
-
-  const paymentAmount = Number(loan.paymentAmount ?? loan.monthlyPayment ?? 0) || 0;
-  const scheduledTotal = term > 0 ? paymentAmount * term : 0;
-
-  const totalPaid = Array.isArray(loan.payments)
-    ? loan.payments.reduce((s, p) => s + (Number(p.amount) || 0), 0)
-    : 0;
-
-  const principal = Number(loan.originalBalance) || Number(loan.balance) || 0;
-  const estInterest = scheduledTotal > 0 ? Math.max(0, scheduledTotal - principal) : 0;
-
-  const scheduledRemaining = scheduledTotal > 0 ? Math.max(0, scheduledTotal - totalPaid) : 0;
 
   const unitLabel =
     loan.paymentFrequency === "daily"
@@ -1094,19 +1262,11 @@ function LoanCard({ loan, formatPHP, onDelete, onPay, onSetPaid }) {
       </div>
 
       <div style={{ marginTop: 6 }}>
-        Loan Price (Principal): <strong>{formatPHP(principal)}</strong>
-      </div>
-
-      <div style={{ marginTop: 6 }}>
-        Remaining Balance: <strong>{formatPHP(loan.balance)}</strong>
-      </div>
-
-      <div>
         Payment: {paymentAmount ? `${formatPHP(paymentAmount)} / ${unitLabel}` : "-"}
         {term > 0 ? ` • Term: ${term} ${term === 1 ? unitLabel : unitLabel + "s"}` : ""}
       </div>
 
-      {/* Term Progress with manual edit */}
+      {/* Term Progress */}
       <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <div>
           Term Progress:{" "}
@@ -1145,26 +1305,26 @@ function LoanCard({ loan, formatPHP, onDelete, onPay, onSetPaid }) {
         />
       </div>
 
-      {/* Totals / interest snapshot */}
+      {/* Clean Financial Snapshot */}
       <div style={{ marginTop: 10, border: "1px solid #ddd", borderRadius: 10, padding: 10 }}>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span>Total Paid (records)</span>
-          <strong>{formatPHP(totalPaid)}</strong>
+          <span>Tracked Total</span>
+          <strong>{term > 0 ? formatPHP(trackedTotal) : "-"}</strong>
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-          <span>Scheduled Total (payment × term)</span>
-          <strong>{scheduledTotal > 0 ? formatPHP(scheduledTotal) : "-"}</strong>
+          <span>Total Paid</span>
+          <strong>{formatPHP(totalPaidByTerms)}</strong>
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-          <span>Scheduled Remaining</span>
-          <strong>{scheduledTotal > 0 ? formatPHP(scheduledRemaining) : "-"}</strong>
+          <span>Remaining Balance</span>
+          <strong>{formatPHP(remainingByTerms)}</strong>
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-          <span>Estimated Interest</span>
-          <strong>{scheduledTotal > 0 ? formatPHP(estInterest) : "-"}</strong>
+          <span>Remaining Terms</span>
+          <strong>{remainingTerms}</strong>
         </div>
       </div>
 
@@ -1187,22 +1347,6 @@ function LoanCard({ loan, formatPHP, onDelete, onPay, onSetPaid }) {
         </div>
       ) : (
         <div style={{ marginTop: 10, fontWeight: "bold", color: "#2e7d32" }}>✅ Fully Paid</div>
-      )}
-
-      {loan.payments?.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: "bold", marginBottom: 6 }}>Payments</div>
-          {loan.payments.slice(0, 5).map((p, idx) => (
-            <div key={idx} style={{ paddingLeft: 8, opacity: 0.9 }}>
-              {new Date(p.date).toLocaleString()} <span style={{ float: "right" }}>{formatPHP(p.amount)}</span>
-            </div>
-          ))}
-          {loan.payments.length > 5 && (
-            <div style={{ paddingLeft: 8, opacity: 0.7, marginTop: 4 }}>
-              …and {loan.payments.length - 5} more
-            </div>
-          )}
-        </div>
       )}
     </div>
   );

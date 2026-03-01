@@ -2,12 +2,19 @@
   --bg-main: #0f172a;
   --bg-card: #1e293b;
   --bg-card-soft: #243046;
-  --border: #334155;
+  --border: rgba(255,255,255,0.08);
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
   --accent: #3b82f6;
   --success: #22c55e;
   --danger: #ef4444;
+}
+
+/* GLOBAL RESET */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
@@ -16,86 +23,179 @@ body {
   color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
     "SF Pro Text", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* CONTAINER */
 .app-container {
-  padding: 20px;
-  max-width: 1100px;
+  padding: 18px;
+  max-width: 900px;
   margin: 0 auto;
 }
 
-/* Navigation */
+/* HEADINGS */
+h1 {
+  font-size: 28px;
+  margin-bottom: 14px;
+}
+
+h2 {
+  font-size: 22px;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+/* NAVIGATION */
 .nav-tabs {
   display: flex;
   gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 24px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 22px;
+  scrollbar-width: none;
+}
+
+.nav-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .nav-button {
-  padding: 10px 16px;
-  border-radius: 12px;
+  flex: 0 0 auto;
+  padding: 10px 18px;
+  border-radius: 999px;
   border: 1px solid var(--border);
-  background: var(--bg-card);
+  background: rgba(255,255,255,0.04);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: 0.2s ease;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.nav-button:hover {
+  background: rgba(255,255,255,0.08);
 }
 
 .nav-button.active {
-  background: var(--accent);
+  background: linear-gradient(135deg, #4f8cff, #2e5fff);
   color: white;
   border: none;
+  box-shadow: 0 4px 12px rgba(59,130,246,0.4);
 }
 
-/* Cards */
+/* CARDS */
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 16px;
-  margin-bottom: 16px;
+  border-radius: 18px;
+  padding: 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.25);
 }
 
 .card-soft {
   background: var(--bg-card-soft);
 }
 
-/* Buttons */
+/* BUTTONS */
 button {
-  border-radius: 12px;
-  padding: 8px 14px;
+  border-radius: 14px;
+  padding: 12px 16px;
   border: 1px solid var(--border);
-  background: var(--bg-card-soft);
+  background: rgba(255,255,255,0.05);
   color: var(--text-primary);
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 button:hover {
-  opacity: 0.85;
+  background: rgba(255,255,255,0.1);
+  transform: translateY(-1px);
 }
 
-/* Inputs */
+button:active {
+  transform: translateY(0);
+}
+
+/* PRIMARY BUTTON (Used for Add / Important Actions) */
+.primary-btn {
+  width: 100%;
+  border: none;
+  background: linear-gradient(135deg, #4f8cff, #2e5fff);
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(59,130,246,0.35);
+}
+
+.primary-btn:hover {
+  opacity: 0.95;
+}
+
+/* FORM GRID */
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* MODERN INPUT STYLE */
 input,
 select {
-  background: var(--bg-card-soft);
+  width: 100%;
+  padding: 14px 14px;
+  border-radius: 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 10px;
+  background: linear-gradient(
+    145deg,
+    rgba(255,255,255,0.04),
+    rgba(255,255,255,0.02)
+  );
   color: var(--text-primary);
+  font-size: 15px;
+  transition: all 0.2s ease;
+  outline: none;
 }
 
-/* Responsive */
+/* Placeholder */
+input::placeholder {
+  color: rgba(255,255,255,0.35);
+}
+
+/* Hover */
+input:hover,
+select:hover {
+  border-color: rgba(255,255,255,0.18);
+}
+
+/* Focus Glow */
+input:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.25);
+  background: rgba(255,255,255,0.06);
+}
+
+/* Remove default select arrow styling inconsistencies */
+select {
+  appearance: none;
+}
+
+/* RESPONSIVE */
 @media (max-width: 768px) {
   .app-container {
     padding: 14px;
   }
 
-  .nav-tabs {
-    flex-direction: column;
+  h1 {
+    font-size: 24px;
   }
 
-  .card {
-    padding: 14px;
+  h2 {
+    font-size: 20px;
+  }
+
+  input,
+  button,
+  select {
+    font-size: 16px;
   }
 }
