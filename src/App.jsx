@@ -1,4 +1,6 @@
 import "./App.css";
+import { db } from "./firebase";
+import { collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { useMemo, useState, useEffect } from "react";
 
 function App() {
@@ -17,10 +19,19 @@ function App() {
     }).format(Number(value) || 0);
 
   // ================= INVENTORY =================
-  const [inventory, setInventory] = useState(() => {
-    const saved = localStorage.getItem("inventory");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [inventory, setInventory] = useState([]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "inventory"), (snapshot) => {
+      const items = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setInventory(items);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const [itemName, setItemName] = useState("");
   const [capacity, setCapacity] = useState("");
@@ -28,57 +39,51 @@ function App() {
   const [threshold, setThreshold] = useState("");
   const [pricePerUnit, setPricePerUnit] = useState("");
 
-  function addItem() {
-    if (!itemName || !capacity || !current || !pricePerUnit) return;
+  async function addItem() {
+  if (!itemName || !capacity || !current || !pricePerUnit) return;
 
-    const cap = Number(capacity);
-    const cur = Number(current);
-    const ppu = Number(pricePerUnit);
+  const cap = Number(capacity);
+  const cur = Number(current);
+  const ppu = Number(pricePerUnit);
 
-    if (!Number.isFinite(cap) || cap <= 0) return;
-    if (!Number.isFinite(cur) || cur < 0) return;
-    if (!Number.isFinite(ppu) || ppu < 0) return;
+  if (!Number.isFinite(cap) || cap <= 0) return;
+  if (!Number.isFinite(cur) || cur < 0) return;
+  if (!Number.isFinite(ppu) || ppu < 0) return;
 
-    const newItem = {
-      id: Date.now(),
-      name: itemName.trim(),
-      capacity: cap,
-      current: Math.min(cur, cap),
-      threshold: Math.max(0, Math.min(Number(threshold) || 0, cap)),
-      pricePerUnit: ppu,
-    };
+  const newItem = {
+    name: itemName.trim(),
+    capacity: cap,
+    current: Math.min(cur, cap),
+    threshold: Math.max(0, Math.min(Number(threshold) || 0, cap)),
+    pricePerUnit: ppu,
+  };
 
-    const updated = [...inventory, newItem];
-    setInventory(updated);
-    localStorage.setItem("inventory", JSON.stringify(updated));
+  await addDoc(collection(db, "inventory"), newItem);
 
-    setItemName("");
-    setCapacity("");
-    setCurrent("");
-    setThreshold("");
-    setPricePerUnit("");
+  setItemName("");
+  setCapacity("");
+  setCurrent("");
+  setThreshold("");
+  setPricePerUnit("");
+}
+
+  async function deleteInventoryItem(id) {
+  await deleteDoc(doc(db, "inventory", id));
   }
 
-  function deleteInventoryItem(id) {
-    const updated = inventory.filter((item) => item.id !== id);
-    setInventory(updated);
-    localStorage.setItem("inventory", JSON.stringify(updated));
-  }
+  async function updateCurrent(id, value) {
+    let newValue = Number(value);
+    if (!Number.isFinite(newValue)) newValue = 0;
 
-  function updateCurrent(id, value) {
-    const updated = inventory.map((item) => {
-      if (item.id === id) {
-        let newValue = Number(value);
-        if (!Number.isFinite(newValue)) newValue = 0;
-        if (newValue < 0) newValue = 0;
-        if (newValue > item.capacity) newValue = item.capacity;
-        return { ...item, current: newValue };
-      }
-      return item;
+    const item = inventory.find((i) => i.id === id);
+    if (!item) return;
+
+    if (newValue < 0) newValue = 0;
+    if (newValue > item.capacity) newValue = item.capacity;
+
+    await updateDoc(doc(db, "inventory", id), {
+      current: newValue,
     });
-
-    setInventory(updated);
-    localStorage.setItem("inventory", JSON.stringify(updated));
   }
 
   // ================= GROCERY =================
@@ -275,8 +280,8 @@ function App() {
       addHistoryEntry(newEntry);
     }
 
-    setInventory(updatedInventory);
-    localStorage.setItem("inventory", JSON.stringify(updatedInventory));
+    // setInventory(updatedInventory);
+    // localStorage.setItem("inventory", JSON.stringify(updatedInventory));
 
     setRestockQuantities({});
     setManualItems([]);
