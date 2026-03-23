@@ -2,11 +2,47 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Home Ledger</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/home-ledger/manifest.json" />
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#4f8ef7" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Home Ledger" />
+
+    <!-- Apple touch icons (fallback since we don't have PNG icons yet) -->
+    <link rel="apple-touch-icon" href="/home-ledger/vite.svg" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker
+            .register('/home-ledger/sw.js', { scope: '/home-ledger/' })
+            .then(reg => {
+              console.log('SW registered:', reg.scope);
+              // Check for updates
+              reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('New SW available, reload to update');
+                  }
+                });
+              });
+            })
+            .catch(err => console.log('SW registration failed:', err));
+        });
+      }
+    </script>
   </body>
 </html>
