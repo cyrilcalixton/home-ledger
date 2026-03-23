@@ -1,0 +1,27 @@
+{
+  "name": "Home Ledger",
+  "short_name": "HomeLedger",
+  "description": "Track household finances, inventory, bills, loans, and grocery lists",
+  "start_url": "/home-ledger/",
+  "scope": "/home-ledger/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#4f8ef7",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/home-ledger/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/home-ledger/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "utilities"],
+  "prefer_related_applications": false
+}
